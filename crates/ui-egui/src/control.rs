@@ -16,6 +16,7 @@
 //! - `ui.window.open {document?}` / `ui.window.close {window}`: extra document windows
 //! - `ui.pointer {events: [{kind: down|move|up, x, y, pressure?, tiltX?, tiltY?, rotation?}], modifiers?, button?}`: drive the active tool in document coordinates (`button: "secondary"` opens the tool's canvas context menu or Brush Preset picker, or erases with Preferences › Tools › Right-click with painting tools = erase)
 //! - `ui.click {x, y, button?, count?}` / `ui.move {x, y}`: synthetic pointer input in screen points
+//!   (`count` is an integer from 1 to 10)
 //! - `ui.key {key, command?, shift?, alt?, ctrl?}` / `ui.type {text}`: synthetic keyboard input
 //! - `ui.resize {width, height}`: resize the main window
 //! - `ui.gpu.simulateLoss {error?}`: act as if the wgpu device was lost (or, with `error: true`,
@@ -626,9 +627,19 @@ fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) 
                 "middle" => egui::PointerButton::Middle,
                 _ => egui::PointerButton::Primary,
             };
+            let clicks = if req.method == "ui.click" {
+                match p.get("count") {
+                    None => 1,
+                    Some(value) => match value.as_u64() {
+                        Some(count @ 1..=10) => count,
+                        _ => return err("`count` must be an integer from 1 to 10"),
+                    },
+                }
+            } else {
+                0
+            };
             app.synthetic.push(egui::Event::PointerMoved(pos));
             if req.method == "ui.click" {
-                let clicks = p.get("count").and_then(Value::as_u64).unwrap_or(1);
                 for _ in 0..clicks {
                     app.synthetic.push(egui::Event::PointerButton { pos, button, pressed: true, modifiers: Default::default() });
                     app.synthetic.push(egui::Event::PointerButton { pos, button, pressed: false, modifiers: Default::default() });
@@ -807,6 +818,20 @@ pub fn save_screenshot(app: &mut PhotocraftApp, image: &egui::ColorImage, path: 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn synthetic_click_count_is_bounded_before_queueing_events() {
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let ctx = egui::Context::default();
+        for count in [json!(0), json!(11), json!(u64::MAX), json!("many")] {
+            let reply = call(&mut app, &ctx, "ui.click", json!({"x": 1, "y": 2, "count": count}));
+            assert_eq!(reply["ok"], false, "{reply}");
+            assert!(app.synthetic.is_empty(), "rejected input must not queue events");
+        }
+        let (request, _) = ControlRequest::new("ui.click", json!({"x": 1, "y": 2, "count": 2}));
+        assert!(matches!(handle(&mut app, &ctx, &request), Outcome::AfterInput));
+        assert_eq!(app.synthetic.len(), 5); // move, then two press/release pairs
+    }
 
     fn call(app: &mut PhotocraftApp, ctx: &egui::Context, method: &str, params: Value) -> Value {
         let (req, _rx) = ControlRequest::new(method, params);
