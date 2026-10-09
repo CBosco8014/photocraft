@@ -74,7 +74,12 @@ try {
     # The dlib authenticates with DefaultAzureCredential, which reads AZURE_TENANT_ID,
     # AZURE_CLIENT_ID and AZURE_CLIENT_SECRET from the environment.
     $pkg = Join-Path $tmp 'trusted-signing.zip'
-    Invoke-WebRequest -Uri 'https://www.nuget.org/api/v2/package/Microsoft.Trusted.Signing.Client' -OutFile $pkg
+    $pkgVersion = '1.0.95'
+    $pkgSha256 = '3bfcf1e0a3cb42af1692f0a8ed45c15de070c2de86f28a59b2795d904d8a920f'
+    $pkgUrl = "https://api.nuget.org/v3-flatcontainer/microsoft.trusted.signing.client/$pkgVersion/microsoft.trusted.signing.client.$pkgVersion.nupkg"
+    Invoke-WebRequest -Uri $pkgUrl -OutFile $pkg
+    $actualSha256 = (Get-FileHash -Path $pkg -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($actualSha256 -ne $pkgSha256) { throw 'Trusted Signing client SHA-256 mismatch; refusing to load its DLL' }
     Expand-Archive -Path $pkg -DestinationPath (Join-Path $tmp 'client') -Force
     $dlib = Get-ChildItem -Path (Join-Path $tmp 'client') -Recurse -Filter Azure.CodeSigning.Dlib.dll |
       Where-Object { $_.FullName -match '\\x64\\' } | Select-Object -First 1

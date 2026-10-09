@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 300
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Build, test and package in a FreeBSD VM
         uses: vmactions/freebsd-vm@c46abacb49f09938ca4e1702d15d836285d694cc # v1
         with:
@@ -42,8 +42,12 @@ jobs:
           # Nothing to bring back; copying the target dir out of the VM fails on large builds.
           copyback: false
           prepare: |
+            set -e
             pkg install -y bash git curl pkgconf cmake python3 libxkbcommon wayland libX11 libXcursor libXrandr libXi libxcb mesa-libs vulkan-loader gtk3 fontconfig freetype2 alsa-lib
-            curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal
+            curl --proto '=https' --tlsv1.2 -fsSL -o /tmp/photocraft-rustup-init https://static.rust-lang.org/rustup/dist/x86_64-unknown-freebsd/rustup-init
+            test "$(sha256 -q /tmp/photocraft-rustup-init)" = af29791be32fd2f926865a983edc97f452078e6d1b4a6037d12ca2f8e67ffa3d
+            chmod +x /tmp/photocraft-rustup-init
+            /tmp/photocraft-rustup-init -y --profile minimal
           run: |
             set -e
             . "$HOME/.cargo/env"

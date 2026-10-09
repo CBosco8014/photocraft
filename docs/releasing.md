@@ -38,6 +38,13 @@ and ids stay lowercase (`photocraft-<version>-<platform>-<arch>.<ext>`, `ai.stor
 Pushing to `release` again before you publish rebuilds the same draft and replaces its assets.
 After the draft is published, the workflow refuses to touch that version again, so bump it first.
 
+**Build-tool pins:** workflows pin third-party Actions by commit and verify the downloaded
+nfpm, Trunk, actionlint, FreeBSD rustup-init and Windows Trusted Signing client by SHA-256.
+The Linux packaging script also checks the cached or downloaded appimagetool. When upgrading
+one of these tools, update its version/ref and hash together from the publisher's official
+release, then run `actionlint` and a packaging smoke test. A changed asset should fail the
+build until its new bytes have been reviewed and the hash deliberately updated.
+
 **Test runs:** *Actions → Release → Run workflow* runs the whole pipeline by hand. The optional
 `version` input (such as `0.2.0-rc.1`) overrides `Cargo.toml` for that run only. The jobs apply
 it with `cargo xtask version set` before building, so the binaries report it too. The run still

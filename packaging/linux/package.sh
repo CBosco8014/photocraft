@@ -109,10 +109,16 @@ if has appimage; then
   TOOL="${APPIMAGETOOL:-$(command -v appimagetool || true)}"
   if [ -z "$TOOL" ]; then
     TOOL="$CARGO_TARGET_DIR/appimagetool-$ARCH.AppImage"
+    case "$ARCH" in
+      x86_64) expected_sha256=95cbe7cce9717fce90c484e34052ee7c7f1d7635b33c12525b4776826a7d29b6 ;;
+      aarch64) expected_sha256=a595ea34cd6136c7f595e9dcbb16f3e9725d7610efb9e43b38c3c6e86cafc270 ;;
+    esac
     if [ ! -x "$TOOL" ]; then
       curl -fsSL -o "$TOOL" "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-$ARCH.AppImage"
-      chmod +x "$TOOL"
     fi
+    # `continuous` can be replaced upstream; fail closed if its bytes change. Also check cache.
+    echo "$expected_sha256  $TOOL" | sha256sum -c -
+    chmod +x "$TOOL"
   fi
   # Absolute, because appimagetool runs in $DIST below (CARGO_TARGET_DIR or APPIMAGETOOL may be
   # relative, e.g. target/agent-<name>).
